@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Recordatorios Pro</title>
+    <title>Recordatorios Expert</title>
     <link rel="manifest" href="data:application/manifest+json,{'name':'Alertas','display':'standalone'}" />
     <style>
-        /* Mantengo tu estilo visual actual */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 500px; margin: 0 auto; }
         .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; font-weight: 800; }
+        label { font-size: 12px; color: #666; font-weight: bold; }
         input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
         .days-selector { display: flex; justify-content: space-between; margin: 10px 0; gap: 5px; }
-        .day-btn { flex: 1; padding: 10px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; }
+        .day-btn { flex: 1; padding: 10px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; cursor: pointer; }
         .day-btn.active { background: #007AFF; color: white; border-color: #007AFF; }
-        .btn-main { width: 100%; padding: 15px; background: #007AFF; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 17px; margin-top: 10px; }
-        .btn-apple { width: 100%; padding: 12px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-main { width: 100%; padding: 16px; background: #007AFF; color: white; border: none; border-radius: 14px; font-weight: bold; font-size: 17px; margin-top: 10px; }
         .reminder-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #007AFF; }
         .alert-active { background: #FF3B30 !important; color: white !important; animation: shake 0.5s infinite; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
@@ -28,9 +27,12 @@
     <div class="container">
         <h1>⏰ Alertas Pro</h1>
         <div class="card">
-            <input type="text" id="title" placeholder="¿Qué tarea es?">
+            <label>Tarea</label>
+            <input type="text" id="title" placeholder="Ej: Revisión óptica">
+            <label>Inicio de la primera alerta</label>
             <input type="datetime-local" id="startDate">
-            <div class="days-selector" id="daysWrapper">
+            <label>Días activos</label>
+            <div class="days-selector">
                 <div class="day-btn active" data-day="1">L</div>
                 <div class="day-btn active" data-day="2">M</div>
                 <div class="day-btn active" data-day="3">X</div>
@@ -39,12 +41,12 @@
                 <div class="day-btn" data-day="6">S</div>
                 <div class="day-btn" data-day="0">D</div>
             </div>
+            <label>Repetir cada (ej: 30 minutos)</label>
             <div style="display:flex; gap:10px;">
                 <input type="number" id="interval" value="30">
                 <select id="unit"><option value="m">Minutos</option><option value="h">Horas</option></select>
             </div>
-            <button class="btn-main" onclick="add()">1. Guardar en App</button>
-            <button class="btn-apple" onclick="syncWithApple()">2. Asegurar en iPhone </button>
+            <button class="btn-main" onclick="processAll()">Guardar y Sincronizar iPhone</button>
         </div>
         <div id="list"></div>
     </div>
@@ -53,52 +55,69 @@
         let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
         document.querySelectorAll('.day-btn').forEach(btn => btn.onclick = () => btn.classList.toggle('active'));
 
-        function add() {
+        // Fecha actual
+        const d = new Date();
+        document.getElementById('startDate').value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+
+        async function processAll() {
+            // 1. Pedir permisos de notificación
+            if ("Notification" in window) await Notification.requestPermission();
+            
+            // 2. Guardar en la lista interna (con recurrencia)
+            const added = addReminder();
+            
+            // 3. Abrir automáticamente Recordatorios de iPhone
+            if (added) syncWithApple(added);
+        }
+
+        function addReminder() {
             const t = document.getElementById('title').value;
             const s = new Date(document.getElementById('startDate').value).getTime();
             const i = parseInt(document.getElementById('interval').value);
             const u = document.getElementById('unit').value;
             const selectedDays = Array.from(document.querySelectorAll('.day-btn.active')).map(b => parseInt(b.dataset.day));
 
-            if (!t || isNaN(s)) return alert("Completa la tarea y la fecha");
+            if (!t || isNaN(s)) return null;
 
-            reminders.push({
+            const newRem = {
                 id: Date.now(),
                 title: t,
                 ms: u === 'm' ? i * 60000 : i * 3600000,
                 next: s,
                 days: selectedDays,
                 isAlerting: false
-            });
-            localStorage.setItem('reminders', JSON.stringify(reminders));
+            };
+
+            reminders.push(newRem);
+            save();
             render();
+            return newRem;
         }
 
-        function syncWithApple() {
-            const t = document.getElementById('title').value;
-            const s = document.getElementById('startDate').value; // Formato YYYY-MM-DDTHH:MM
-            if (!t || !s) return alert("Primero rellena la tarea y la fecha");
-
-            // Crear enlace para abrir Recordatorios nativos con los datos
-            const appleDate = s.replace(/-/g, '').replace(/:/g, '').replace('T', 'T') + '00';
-            const url = `x-apple-reminder://create?title=${encodeURIComponent(t)}&dueDate=${s}`;
-            
+        function syncWithApple(rem) {
+            const dateObj = new Date(rem.next);
+            // Formato para URL scheme de iOS
+            const isoDate = dateObj.toISOString().split('.')[0] + 'Z';
+            const url = `x-apple-reminder://create?title=${encodeURIComponent(rem.title)}&dueDate=${encodeURIComponent(isoDate)}`;
             window.location.href = url;
-            alert("Se abrirá la app Recordatorios. Pulsa 'Añadir' para asegurar que suene con la pantalla apagada.");
         }
 
         function render() {
             const list = document.getElementById('list');
             const now = Date.now();
             const currentDay = new Date().getDay();
+
             list.innerHTML = reminders.map(r => {
                 const isCorrectDay = r.days.includes(currentDay);
+                // Si ha pasado la hora y es el día correcto, activar alerta
                 if (r.next <= now && isCorrectDay) r.isAlerting = true;
+
                 return `
                     <div class="reminder-card ${r.isAlerting ? 'alert-active' : ''}">
                         <strong>${r.title}</strong>
-                        <div>Siguiente: ${new Date(r.next).toLocaleString()}</div>
-                        ${r.isAlerting ? `<button class="btn-action" onclick="complete(${r.id})">✓ Realizada</button>` : ''}
+                        <div>${r.isAlerting ? '⚠️ PENDIENTE' : 'Próxima: ' + new Date(r.next).toLocaleString()}</div>
+                        ${r.isAlerting ? `<button class="btn-action" onclick="complete(${r.id})">✓ Tarea Realizada</button>` : ''}
+                        <button onclick="del(${r.id})" style="border:none; background:none; color:red; font-size:10px; margin-top:10px;">Eliminar</button>
                     </div>
                 `;
             }).join('');
@@ -107,11 +126,19 @@
         function complete(id) {
             const r = reminders.find(x => x.id === id);
             r.isAlerting = false;
+            // RECURRENCIA: Suma el intervalo para la próxima vez
             r.next = Date.now() + r.ms;
-            localStorage.setItem('reminders', JSON.stringify(reminders));
+            save();
             render();
         }
 
+        function del(id) {
+            reminders = reminders.filter(x => x.id !== id);
+            save();
+            render();
+        }
+
+        function save() { localStorage.setItem('reminders', JSON.stringify(reminders)); }
         setInterval(render, 5000);
         render();
     </script>
