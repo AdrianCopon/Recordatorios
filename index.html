@@ -3,129 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Recordatorios Persistentes</title>
+    <title>Recordatorios Pro</title>
     <link rel="manifest" href="data:application/manifest+json,{'name':'Alertas','display':'standalone'}" />
     <style>
+        /* Mantengo tu estilo visual actual */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, system-ui, sans-serif;
-            background: #f0f2f5; padding: 20px; transition: background 0.3s;
-        }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { max-width: 500px; margin: 0 auto; }
-        .form-card { background: white; border-radius: 20px; padding: 20px; shadow: 0 10px 20px rgba(0,0,0,0.1); margin-bottom: 20px; }
-        h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; }
+        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; font-weight: 800; }
         input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
-        .btn-main { width: 100%; padding: 15px; background: #007AFF; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 17px; }
-        
-        .reminder-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #007AFF; position: relative; }
+        .days-selector { display: flex; justify-content: space-between; margin: 10px 0; gap: 5px; }
+        .day-btn { flex: 1; padding: 10px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; }
+        .day-btn.active { background: #007AFF; color: white; border-color: #007AFF; }
+        .btn-main { width: 100%; padding: 15px; background: #007AFF; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 17px; margin-top: 10px; }
+        .btn-apple { width: 100%; padding: 12px; background: #000; color: white; border: none; border-radius: 12px; font-weight: bold; margin-top: 8px; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .reminder-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #007AFF; }
         .alert-active { background: #FF3B30 !important; color: white !important; animation: shake 0.5s infinite; }
-        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(5px); } 50% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
-        
-        .btn-action { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-        .btn-done { background: #34C759; color: white; }
-        .btn-del { background: #eee; color: #FF3B30; margin-top: 5px; }
-        .timer { font-size: 24px; font-weight: 800; text-align: center; margin: 10px 0; }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
+        .btn-action { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 8px; font-weight: bold; background: #34C759; color: white; }
     </style>
 </head>
 <body>
-    <div class="container" id="mainApp">
-        <h1>⏰ Alertas</h1>
-        <div class="form-card">
-            <input type="text" id="title" placeholder="¿Qué hay que hacer?">
-            <label style="font-size: 12px; color: #666;">Empieza el:</label>
+    <div class="container">
+        <h1>⏰ Alertas Pro</h1>
+        <div class="card">
+            <input type="text" id="title" placeholder="¿Qué tarea es?">
             <input type="datetime-local" id="startDate">
+            <div class="days-selector" id="daysWrapper">
+                <div class="day-btn active" data-day="1">L</div>
+                <div class="day-btn active" data-day="2">M</div>
+                <div class="day-btn active" data-day="3">X</div>
+                <div class="day-btn active" data-day="4">J</div>
+                <div class="day-btn active" data-day="5">V</div>
+                <div class="day-btn" data-day="6">S</div>
+                <div class="day-btn" data-day="0">D</div>
+            </div>
             <div style="display:flex; gap:10px;">
                 <input type="number" id="interval" value="30">
                 <select id="unit"><option value="m">Minutos</option><option value="h">Horas</option></select>
             </div>
-            <button class="btn-main" onclick="initApp()">Crear Alerta Persistente</button>
+            <button class="btn-main" onclick="add()">1. Guardar en App</button>
+            <button class="btn-apple" onclick="syncWithApple()">2. Asegurar en iPhone </button>
         </div>
         <div id="list"></div>
     </div>
 
     <script>
         let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
-        
-        // Configurar fecha actual
-        const d = new Date();
-        d.setMinutes(d.getMinutes() - d.getUTCMinutes() % 1 + 60); // Próxima hora redonda
-        document.getElementById('startDate').value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
-
-        async function initApp() {
-            if ("Notification" in window) await Notification.requestPermission();
-            add();
-        }
+        document.querySelectorAll('.day-btn').forEach(btn => btn.onclick = () => btn.classList.toggle('active'));
 
         function add() {
             const t = document.getElementById('title').value;
             const s = new Date(document.getElementById('startDate').value).getTime();
             const i = parseInt(document.getElementById('interval').value);
             const u = document.getElementById('unit').value;
-            if (!t) return;
+            const selectedDays = Array.from(document.querySelectorAll('.day-btn.active')).map(b => parseInt(b.dataset.day));
+
+            if (!t || isNaN(s)) return alert("Completa la tarea y la fecha");
 
             reminders.push({
                 id: Date.now(),
                 title: t,
                 ms: u === 'm' ? i * 60000 : i * 3600000,
                 next: s,
+                days: selectedDays,
                 isAlerting: false
             });
-            save();
+            localStorage.setItem('reminders', JSON.stringify(reminders));
             render();
+        }
+
+        function syncWithApple() {
+            const t = document.getElementById('title').value;
+            const s = document.getElementById('startDate').value; // Formato YYYY-MM-DDTHH:MM
+            if (!t || !s) return alert("Primero rellena la tarea y la fecha");
+
+            // Crear enlace para abrir Recordatorios nativos con los datos
+            const appleDate = s.replace(/-/g, '').replace(/:/g, '').replace('T', 'T') + '00';
+            const url = `x-apple-reminder://create?title=${encodeURIComponent(t)}&dueDate=${s}`;
+            
+            window.location.href = url;
+            alert("Se abrirá la app Recordatorios. Pulsa 'Añadir' para asegurar que suene con la pantalla apagada.");
         }
 
         function render() {
             const list = document.getElementById('list');
             const now = Date.now();
-            let html = '';
-
-            reminders.forEach(r => {
-                const diff = r.next - now;
-                
-                // LÓGICA DE PERSISTENCIA
-                if (diff <= 0) {
-                    r.isAlerting = true;
-                    if (Math.floor(now/1000) % 5 === 0) { // Notificar cada 5 segundos si no se ha hecho
-                        new Notification("⚠️ TAREA PENDIENTE", { body: r.title, tag: r.id });
-                        try { window.navigator.vibrate(200); } catch(e){}
-                    }
-                }
-
-                html += `
+            const currentDay = new Date().getDay();
+            list.innerHTML = reminders.map(r => {
+                const isCorrectDay = r.days.includes(currentDay);
+                if (r.next <= now && isCorrectDay) r.isAlerting = true;
+                return `
                     <div class="reminder-card ${r.isAlerting ? 'alert-active' : ''}">
                         <strong>${r.title}</strong>
-                        <div class="timer">${r.isAlerting ? '¡HAZLO AHORA!' : format(diff)}</div>
-                        ${r.isAlerting ? 
-                            `<button class="btn-action btn-done" onclick="complete(${r.id})">✓ Tarea Realizada</button>` : 
-                            `<button class="btn-action btn-del" onclick="del(${r.id})">Eliminar</button>`}
+                        <div>Siguiente: ${new Date(r.next).toLocaleString()}</div>
+                        ${r.isAlerting ? `<button class="btn-action" onclick="complete(${r.id})">✓ Realizada</button>` : ''}
                     </div>
                 `;
-            });
-            list.innerHTML = html;
+            }).join('');
         }
 
         function complete(id) {
             const r = reminders.find(x => x.id === id);
             r.isAlerting = false;
-            r.next = Date.now() + r.ms; // Programar siguiente
-            save();
+            r.next = Date.now() + r.ms;
+            localStorage.setItem('reminders', JSON.stringify(reminders));
             render();
         }
 
-        function del(id) {
-            reminders = reminders.filter(x => x.id !== id);
-            save();
-            render();
-        }
-
-        function format(ms) {
-            const s = Math.floor(ms/1000);
-            return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m ${s%60}s`;
-        }
-
-        function save() { localStorage.setItem('reminders', JSON.stringify(reminders)); }
-        
-        setInterval(render, 1000);
+        setInterval(render, 5000);
         render();
     </script>
 </body>
