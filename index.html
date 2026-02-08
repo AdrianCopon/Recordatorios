@@ -3,156 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Recordatorios Pro</title>
-    <link rel="manifest" href="data:application/manifest+json,{'name':'Recordatorios','short_name':'Alertas','start_url':'.','display':'standalone'}" />
+    <title>Recordatorios Persistentes</title>
+    <link rel="manifest" href="data:application/manifest+json,{'name':'Alertas','display':'standalone'}" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; padding: 20px; color: #333;
+            font-family: -apple-system, system-ui, sans-serif;
+            background: #f0f2f5; padding: 20px; transition: background 0.3s;
         }
         .container { max-width: 500px; margin: 0 auto; }
-        h1 { color: white; text-align: center; margin-bottom: 30px; font-weight: 800; }
-        .form-card { background: white; border-radius: 20px; padding: 25px; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-        .input-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 8px; color: #666; font-weight: 600; font-size: 0.9rem; }
-        input, textarea, select { width: 100%; padding: 14px; border: 2px solid #f0f0f0; border-radius: 12px; font-size: 1rem; }
-        .interval-group { display: flex; gap: 10px; }
-        .btn-primary { width: 100%; padding: 16px; background: #007AFF; color: white; border: none; border-radius: 14px; font-size: 1.1rem; font-weight: 700; cursor: pointer; }
-        .reminder-card { background: white; border-radius: 18px; padding: 20px; margin-bottom: 15px; border-left: 6px solid #007AFF; }
-        .status-tag { font-size: 0.75rem; font-weight: bold; padding: 4px 8px; border-radius: 6px; float: right; }
-        .status-waiting { background: #FFD60A; color: #000; }
-        .status-active { background: #34C759; color: #fff; }
-        .countdown { font-size: 1.4rem; font-weight: 800; color: #FF3B30; text-align: center; margin: 10px 0; }
-        .btn-done { width: 100%; padding: 12px; background: #8E8E93; color: white; border: none; border-radius: 10px; font-weight: 600; }
+        .form-card { background: white; border-radius: 20px; padding: 20px; shadow: 0 10px 20px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; }
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
+        .btn-main { width: 100%; padding: 15px; background: #007AFF; color: white; border: none; border-radius: 12px; font-weight: bold; font-size: 17px; }
+        
+        .reminder-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #007AFF; position: relative; }
+        .alert-active { background: #FF3B30 !important; color: white !important; animation: shake 0.5s infinite; }
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(5px); } 50% { transform: translateX(-5px); } 100% { transform: translateX(0); } }
+        
+        .btn-action { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .btn-done { background: #34C759; color: white; }
+        .btn-del { background: #eee; color: #FF3B30; margin-top: 5px; }
+        .timer { font-size: 24px; font-weight: 800; text-align: center; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>⏰ Recordatorios</h1>
-        
+    <div class="container" id="mainApp">
+        <h1>⏰ Alertas</h1>
         <div class="form-card">
-            <div class="input-group">
-                <label>Tarea</label>
-                <input type="text" id="title" placeholder="Ej: Medicación o revisión">
+            <input type="text" id="title" placeholder="¿Qué hay que hacer?">
+            <label style="font-size: 12px; color: #666;">Empieza el:</label>
+            <input type="datetime-local" id="startDate">
+            <div style="display:flex; gap:10px;">
+                <input type="number" id="interval" value="30">
+                <select id="unit"><option value="m">Minutos</option><option value="h">Horas</option></select>
             </div>
-            <div class="input-group">
-                <label>Fecha y Hora de Inicio</label>
-                <input type="datetime-local" id="startDate">
-            </div>
-            <div class="input-group">
-                <label>Repetir cada:</label>
-                <div class="interval-group">
-                    <input type="number" id="interval" value="30">
-                    <select id="unit">
-                        <option value="minutes">Minutos</option>
-                        <option value="hours">Horas</option>
-                    </select>
-                </div>
-            </div>
-            <button class="btn-primary" onclick="requestPermissionAndAdd()">Programar Alerta</button>
+            <button class="btn-main" onclick="initApp()">Crear Alerta Persistente</button>
         </div>
-        
-        <div id="remindersList"></div>
+        <div id="list"></div>
     </div>
 
     <script>
         let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
+        
+        // Configurar fecha actual
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - d.getUTCMinutes() % 1 + 60); // Próxima hora redonda
+        document.getElementById('startDate').value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
-        // Poner fecha actual por defecto en el input
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-        document.getElementById('startDate').value = now.toISOString().slice(0,16);
-
-        if ('serviceWorker' in navigator) {
-            const swCode = "self.addEventListener('fetch', function(event) {});";
-            const blob = new Blob([swCode], {type: 'text/javascript'});
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl);
+        async function initApp() {
+            if ("Notification" in window) await Notification.requestPermission();
+            add();
         }
 
-        async function requestPermissionAndAdd() {
-            if ("Notification" in window) {
-                await Notification.requestPermission();
-            }
-            addReminder();
-        }
+        function add() {
+            const t = document.getElementById('title').value;
+            const s = new Date(document.getElementById('startDate').value).getTime();
+            const i = parseInt(document.getElementById('interval').value);
+            const u = document.getElementById('unit').value;
+            if (!t) return;
 
-        function addReminder() {
-            const title = document.getElementById('title').value;
-            const startDate = new Date(document.getElementById('startDate').value).getTime();
-            const interval = parseInt(document.getElementById('interval').value);
-            const unit = document.getElementById('unit').value;
-            
-            if (!title || isNaN(startDate)) return;
-
-            let minutes = unit === 'hours' ? interval * 60 : interval;
-            
-            const reminder = {
+            reminders.push({
                 id: Date.now(),
-                title,
-                interval: minutes,
-                nextAlert: startDate, // Empieza en la fecha elegida
-                notified: false
-            };
-
-            reminders.push(reminder);
+                title: t,
+                ms: u === 'm' ? i * 60000 : i * 3600000,
+                next: s,
+                isAlerting: false
+            });
             save();
             render();
-            document.getElementById('title').value = '';
-        }
-
-        function sendSystemNotification(title) {
-            if (Notification.permission === "granted") {
-                new Notification("⏰ ¡Recordatorio!", { body: title });
-            }
         }
 
         function render() {
-            const list = document.getElementById('remindersList');
+            const list = document.getElementById('list');
             const now = Date.now();
+            let html = '';
 
-            list.innerHTML = reminders.map(r => {
-                const timeLeft = r.nextAlert - now;
-                const isWaiting = timeLeft > 0 && (r.nextAlert > now);
+            reminders.forEach(r => {
+                const diff = r.next - now;
                 
-                if (timeLeft <= 0 && !r.notified) {
-                    r.notified = true;
-                    sendSystemNotification(r.title);
-                    // Reprogramar: sumamos el intervalo a la fecha de la última alerta
-                    r.nextAlert = r.nextAlert + (r.interval * 60 * 1000);
-                    r.notified = false;
-                    save();
+                // LÓGICA DE PERSISTENCIA
+                if (diff <= 0) {
+                    r.isAlerting = true;
+                    if (Math.floor(now/1000) % 5 === 0) { // Notificar cada 5 segundos si no se ha hecho
+                        new Notification("⚠️ TAREA PENDIENTE", { body: r.title, tag: r.id });
+                        try { window.navigator.vibrate(200); } catch(e){}
+                    }
                 }
 
-                return `
-                    <div class="reminder-card">
-                        <span class="status-tag ${timeLeft > 0 ? 'status-waiting' : 'status-active'}">
-                            ${timeLeft > 0 ? 'Próximamente' : '¡Activo!'}
-                        </span>
+                html += `
+                    <div class="reminder-card ${r.isAlerting ? 'alert-active' : ''}">
                         <strong>${r.title}</strong>
-                        <div class="countdown">
-                            ${timeLeft > 0 ? formatTime(timeLeft) : "¡Notificando!"}
-                        </div>
-                        <button class="btn-done" onclick="deleteRem(${r.id})">Eliminar</button>
+                        <div class="timer">${r.isAlerting ? '¡HAZLO AHORA!' : format(diff)}</div>
+                        ${r.isAlerting ? 
+                            `<button class="btn-action btn-done" onclick="complete(${r.id})">✓ Tarea Realizada</button>` : 
+                            `<button class="btn-action btn-del" onclick="del(${r.id})">Eliminar</button>`}
                     </div>
                 `;
-            }).join('');
+            });
+            list.innerHTML = html;
         }
 
-        function formatTime(ms) {
-            const totalSecs = Math.floor(ms / 1000);
-            const h = Math.floor(totalSecs / 3600);
-            const m = Math.floor((totalSecs % 3600) / 60);
-            const s = totalSecs % 60;
-            return `${h > 0 ? h + 'h ' : ''}${m}m ${s}s`;
-        }
-
-        function deleteRem(id) {
-            reminders = reminders.filter(r => r.id !== id);
+        function complete(id) {
+            const r = reminders.find(x => x.id === id);
+            r.isAlerting = false;
+            r.next = Date.now() + r.ms; // Programar siguiente
             save();
             render();
+        }
+
+        function del(id) {
+            reminders = reminders.filter(x => x.id !== id);
+            save();
+            render();
+        }
+
+        function format(ms) {
+            const s = Math.floor(ms/1000);
+            return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m ${s%60}s`;
         }
 
         function save() { localStorage.setItem('reminders', JSON.stringify(reminders)); }
