@@ -12,28 +12,44 @@
         .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
         h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; font-weight: 800; }
         label { display: block; margin-top: 10px; font-size: 12px; color: #666; font-weight: bold; }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
+        
+        /* Ajuste de tamaño y centrado de la fecha */
+        input[type="datetime-local"], input[type="text"], input[type="number"], select { 
+            width: 100%; 
+            padding: 16px; 
+            margin: 8px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 12px; 
+            font-size: 18px; /* Aumentado */
+            text-align: center; /* Centrado */
+            -webkit-appearance: none;
+        }
+
         .days-selector { display: flex; justify-content: space-between; margin: 10px 0; gap: 5px; }
-        .day-btn { flex: 1; padding: 10px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; cursor: pointer; }
+        .day-btn { flex: 1; padding: 12px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; cursor: pointer; }
         .day-btn.active { background: #007AFF; color: white; border-color: #007AFF; }
-        .btn-main { width: 100%; padding: 16px; background: #007AFF; color: white; border: none; border-radius: 14px; font-weight: bold; font-size: 17px; margin-top: 10px; }
-        .reminder-card { background: white; border-radius: 15px; padding: 15px; margin-bottom: 10px; border-left: 5px solid #007AFF; }
+        .btn-main { width: 100%; padding: 18px; background: #007AFF; color: white; border: none; border-radius: 14px; font-weight: bold; font-size: 18px; margin-top: 10px; }
+        
+        .reminder-card { background: white; border-radius: 18px; padding: 20px; margin-bottom: 12px; border-left: 6px solid #007AFF; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
         .alert-active { background: #FF3B30 !important; color: white !important; animation: shake 0.5s infinite; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
-        .btn-action { width: 100%; padding: 12px; margin-top: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; }
+        
+        .btn-action { width: 100%; padding: 14px; margin-top: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
         .btn-done { background: #34C759; color: white; }
-        .btn-delete { background: #FF3B30; color: white; margin-top: 8px; }
+        .btn-delete { background: #FF3B30; color: white; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>⏰ Alertas Pro</h1>
         <div class="card">
-            <label>Tarea</label>
+            <label>¿Qué tarea es?</label>
             <input type="text" id="title" placeholder="Ej: Revisión óptica">
-            <label>Primera alerta</label>
+            
+            <label>Fecha y Hora de Inicio</label>
             <input type="datetime-local" id="startDate">
-            <label>Días activos</label>
+            
+            <label>Días de la semana</label>
             <div class="days-selector">
                 <div class="day-btn active" data-day="1">L</div>
                 <div class="day-btn active" data-day="2">M</div>
@@ -43,12 +59,13 @@
                 <div class="day-btn" data-day="6">S</div>
                 <div class="day-btn" data-day="0">D</div>
             </div>
-            <label>Repetir cada</label>
+            
+            <label>Repetir cada (Tiempo)</label>
             <div style="display:flex; gap:10px;">
                 <input type="number" id="interval" value="30">
                 <select id="unit"><option value="m">Minutos</option><option value="h">Horas</option></select>
             </div>
-            <button class="btn-main" onclick="processAll()">Guardar y Sincronizar iPhone</button>
+            <button class="btn-main" onclick="addReminder()">Guardar Alerta Recurrente</button>
         </div>
         <div id="list"></div>
     </div>
@@ -60,44 +77,29 @@
         const d = new Date();
         document.getElementById('startDate').value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
-        async function processAll() {
+        async function addReminder() {
             if ("Notification" in window) await Notification.requestPermission();
-            const added = addReminder();
-            if (added) syncWithApple(added.title, document.getElementById('startDate').value);
-        }
-
-        function addReminder() {
+            
             const t = document.getElementById('title').value;
             const s = new Date(document.getElementById('startDate').value).getTime();
             const i = parseInt(document.getElementById('interval').value);
             const u = document.getElementById('unit').value;
             const selectedDays = Array.from(document.querySelectorAll('.day-btn.active')).map(b => parseInt(b.dataset.day));
 
-            if (!t || isNaN(s)) return null;
+            if (!t || isNaN(s)) return;
 
-            const newRem = {
+            reminders.push({
                 id: Date.now(),
                 title: t,
                 ms: u === 'm' ? i * 60000 : i * 3600000,
                 next: s,
                 days: selectedDays,
                 isAlerting: false
-            };
-
-            reminders.push(newRem);
+            });
+            
             save();
             render();
             document.getElementById('title').value = '';
-            return newRem;
-        }
-
-        function syncWithApple(title, dateValue) {
-            // El formato calshow:// es más estable para abrir el calendario/recordatorio directamente
-            const date = new Date(dateValue);
-            const timestamp = date.getTime() / 1000;
-            // Intentamos abrir la creación de recordatorio con un formato simplificado
-            const url = `x-apple-reminder://create?title=${encodeURIComponent(title)}`;
-            window.location.href = url;
         }
 
         function render() {
@@ -107,15 +109,20 @@
 
             list.innerHTML = reminders.map(r => {
                 const isCorrectDay = r.days.includes(currentDay);
-                if (r.next <= now && isCorrectDay) r.isAlerting = true;
+                if (r.next <= now && isCorrectDay) {
+                    r.isAlerting = true;
+                    if (Math.floor(now/1000) % 15 === 0) {
+                        new Notification("⚠️ PENDIENTE: " + r.title, { requireInteraction: true });
+                    }
+                }
 
                 return `
                     <div class="reminder-card ${r.isAlerting ? 'alert-active' : ''}">
-                        <strong style="display:block; font-size:18px;">${r.title}</strong>
-                        <div style="font-size:13px; margin:5px 0;">${r.isAlerting ? '⚠️ PENDIENTE' : 'Próxima: ' + new Date(r.next).toLocaleString()}</div>
+                        <strong style="display:block; font-size:20px;">${r.title}</strong>
+                        <div style="font-size:14px; margin:8px 0;">${r.isAlerting ? '¡REALIZAR AHORA!' : 'Próxima: ' + new Date(r.next).toLocaleString()}</div>
                         ${r.isAlerting ? 
                             `<button class="btn-action btn-done" onclick="complete(${r.id})">✓ Tarea Realizada</button>` : 
-                            `<button class="btn-action btn-delete" onclick="del(${r.id})">🗑 Eliminar Recordatorio</button>`}
+                            `<button class="btn-action btn-delete" onclick="del(${r.id})">🗑 Eliminar</button>`}
                     </div>
                 `;
             }).join('');
@@ -124,7 +131,7 @@
         function complete(id) {
             const r = reminders.find(x => x.id === id);
             r.isAlerting = false;
-            r.next = Date.now() + r.ms; // Aquí recuperamos la recurrencia automática
+            r.next = Date.now() + r.ms; // Recurrencia asegurada [cite: 2026-01-14]
             save();
             render();
         }
@@ -138,7 +145,7 @@
         }
 
         function save() { localStorage.setItem('reminders', JSON.stringify(reminders)); }
-        setInterval(render, 5000);
+        setInterval(render, 1000);
         render();
     </script>
 </body>
