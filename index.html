@@ -7,36 +7,53 @@
     <link rel="manifest" href="data:application/manifest+json,{'name':'Alertas','display':'standalone'}" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, system-ui, sans-serif; background: #f0f2f5; padding: 20px; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: #f4f7f9; padding: 20px; }
         .container { max-width: 500px; margin: 0 auto; }
-        .card { background: white; border-radius: 20px; padding: 20px; box-shadow: 0 10px 20px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        .card { background: white; border-radius: 25px; padding: 25px; box-shadow: 0 15px 30px rgba(0,0,0,0.08); margin-bottom: 20px; }
         h1 { text-align: center; margin-bottom: 20px; color: #1c1e21; font-weight: 800; }
-        label { display: block; margin-top: 10px; font-size: 12px; color: #666; font-weight: bold; }
+        label { display: block; margin-top: 15px; font-size: 13px; color: #666; font-weight: bold; text-align: center; }
         
-        /* Ajuste de tamaño y centrado de la fecha */
-        input[type="datetime-local"], input[type="text"], input[type="number"], select { 
-            width: 100%; 
-            padding: 16px; 
-            margin: 8px 0; 
-            border: 1px solid #ddd; 
-            border-radius: 12px; 
-            font-size: 18px; /* Aumentado */
-            text-align: center; /* Centrado */
-            -webkit-appearance: none;
+        /* Estilo para el Reloj y Fecha: Más grande y Centrado */
+        input[type="datetime-local"] {
+            width: 100%;
+            padding: 20px;
+            margin: 10px 0;
+            border: 2px solid #eee;
+            border-radius: 15px;
+            font-size: 22px; /* Reloj mucho más grande */
+            font-weight: bold;
+            text-align: center; /* Centrado del texto */
+            background-color: #fafafa;
+            color: #007AFF;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            -webkit-appearance: none; /* Limpia estilos de iOS para centrar mejor */
         }
 
-        .days-selector { display: flex; justify-content: space-between; margin: 10px 0; gap: 5px; }
-        .day-btn { flex: 1; padding: 12px 0; border: 1px solid #ddd; border-radius: 8px; background: #fff; font-size: 12px; font-weight: bold; text-align: center; cursor: pointer; }
+        input[type="text"], input[type="number"], select { 
+            width: 100%; 
+            padding: 16px; 
+            margin: 10px 0; 
+            border: 1px solid #ddd; 
+            border-radius: 12px; 
+            font-size: 18px; 
+            text-align: center;
+        }
+
+        .days-selector { display: flex; justify-content: space-between; margin: 15px 0; gap: 8px; }
+        .day-btn { flex: 1; padding: 14px 0; border: 1px solid #ddd; border-radius: 10px; background: #fff; font-size: 14px; font-weight: bold; text-align: center; cursor: pointer; }
         .day-btn.active { background: #007AFF; color: white; border-color: #007AFF; }
-        .btn-main { width: 100%; padding: 18px; background: #007AFF; color: white; border: none; border-radius: 14px; font-weight: bold; font-size: 18px; margin-top: 10px; }
         
-        .reminder-card { background: white; border-radius: 18px; padding: 20px; margin-bottom: 12px; border-left: 6px solid #007AFF; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .btn-main { width: 100%; padding: 20px; background: #007AFF; color: white; border: none; border-radius: 18px; font-weight: bold; font-size: 18px; margin-top: 15px; box-shadow: 0 4px 12px rgba(0,122,255,0.3); }
+        
+        .reminder-card { background: white; border-radius: 20px; padding: 20px; margin-bottom: 12px; border-left: 8px solid #007AFF; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
         .alert-active { background: #FF3B30 !important; color: white !important; animation: shake 0.5s infinite; }
         @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(5px); } 75% { transform: translateX(-5px); } }
         
-        .btn-action { width: 100%; padding: 14px; margin-top: 10px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        .btn-action { width: 100%; padding: 16px; margin-top: 12px; border: none; border-radius: 12px; font-weight: bold; cursor: pointer; font-size: 16px; }
         .btn-done { background: #34C759; color: white; }
-        .btn-delete { background: #FF3B30; color: white; margin-top: 10px; }
+        .btn-delete { background: #feebeb; color: #FF3B30; border: 1px solid #ffcccc; }
     </style>
 </head>
 <body>
@@ -44,12 +61,12 @@
         <h1>⏰ Alertas Pro</h1>
         <div class="card">
             <label>¿Qué tarea es?</label>
-            <input type="text" id="title" placeholder="Ej: Revisión óptica">
+            <input type="text" id="title" placeholder="Ej: Revisión de stock">
             
-            <label>Fecha y Hora de Inicio</label>
+            <label>FECHA Y HORA</label>
             <input type="datetime-local" id="startDate">
             
-            <label>Días de la semana</label>
+            <label>Días Activos</label>
             <div class="days-selector">
                 <div class="day-btn active" data-day="1">L</div>
                 <div class="day-btn active" data-day="2">M</div>
@@ -60,12 +77,12 @@
                 <div class="day-btn" data-day="0">D</div>
             </div>
             
-            <label>Repetir cada (Tiempo)</label>
+            <label>Repetición</label>
             <div style="display:flex; gap:10px;">
                 <input type="number" id="interval" value="30">
                 <select id="unit"><option value="m">Minutos</option><option value="h">Horas</option></select>
             </div>
-            <button class="btn-main" onclick="addReminder()">Guardar Alerta Recurrente</button>
+            <button class="btn-main" onclick="addReminder()">Guardar Alerta</button>
         </div>
         <div id="list"></div>
     </div>
@@ -74,6 +91,7 @@
         let reminders = JSON.parse(localStorage.getItem('reminders')) || [];
         document.querySelectorAll('.day-btn').forEach(btn => btn.onclick = () => btn.classList.toggle('active'));
 
+        // Configurar hora actual por defecto
         const d = new Date();
         document.getElementById('startDate').value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
 
@@ -111,17 +129,18 @@
                 const isCorrectDay = r.days.includes(currentDay);
                 if (r.next <= now && isCorrectDay) {
                     r.isAlerting = true;
-                    if (Math.floor(now/1000) % 15 === 0) {
-                        new Notification("⚠️ PENDIENTE: " + r.title, { requireInteraction: true });
+                    // Notificación visual de respaldo
+                    if (Math.floor(now/1000) % 20 === 0) {
+                        new Notification("⚠️ " + r.title);
                     }
                 }
 
                 return `
                     <div class="reminder-card ${r.isAlerting ? 'alert-active' : ''}">
                         <strong style="display:block; font-size:20px;">${r.title}</strong>
-                        <div style="font-size:14px; margin:8px 0;">${r.isAlerting ? '¡REALIZAR AHORA!' : 'Próxima: ' + new Date(r.next).toLocaleString()}</div>
+                        <div style="font-size:14px; margin:8px 0;">${r.isAlerting ? 'PENDIENTE' : 'Próxima: ' + new Date(r.next).toLocaleString()}</div>
                         ${r.isAlerting ? 
-                            `<button class="btn-action btn-done" onclick="complete(${r.id})">✓ Tarea Realizada</button>` : 
+                            `<button class="btn-action btn-done" onclick="complete(${r.id})">✓ Tarea Hecha</button>` : 
                             `<button class="btn-action btn-delete" onclick="del(${r.id})">🗑 Eliminar</button>`}
                     </div>
                 `;
@@ -131,7 +150,7 @@
         function complete(id) {
             const r = reminders.find(x => x.id === id);
             r.isAlerting = false;
-            r.next = Date.now() + r.ms; // Recurrencia asegurada [cite: 2026-01-14]
+            r.next = Date.now() + r.ms; // Recurrencia activada
             save();
             render();
         }
